@@ -1264,6 +1264,16 @@ Sound.prototype.devices = async function () {
     const cmd = o.alsaCmd || ['/var/opt/mgu-python/current/bin/python3', '-I', path.join(__dirname, 'ytalsa.py')];
     const dec = o.ytaud || path.join(__dirname, 'ytaud');
     if (!fs.existsSync(cmd[0]) || !fs.existsSync(dec)) { this.say('the service\'s own player is not installed (' + (!fs.existsSync(cmd[0]) ? cmd[0] : dec) + ')'); this.devs = []; this.others = []; return this.devs; }
+    // state/audio.json {"device": "TelRing_Outband_CF_24_MONO"} names the one device to play to (for a head unit whose
+    // media output is silent: the device of a source that does answer the audio manager); nothing is probed then
+    let forced = null;
+    try { forced = this.a && typeof this.a.conf === 'function' ? this.a.conf().set.device : null; } catch (e) { forced = null; }
+    if (typeof forced === 'string' && /^[A-Za-z0-9_.-]{3,80}$/.test(forced)) {
+        this.say('the device named by audio.json: ' + forced);
+        this.devs = ['plug:smartx:' + forced];
+        this.others = [];
+        return this.devs;
+    }
     const res = await this.alsa(['probe'].concat(o.alsaProbeArgs || []), o.probeDevMs || 20000);
     this.probe = res;
     const all = (res.devices || []).filter((d) => d && typeof d.name === 'string');
