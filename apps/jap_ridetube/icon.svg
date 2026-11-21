@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- MeTube: a rounded square with a play mark. Original drawing. -->
+  <rect width="256" height="256" fill="#0f0f0f"/>
+  <rect x="36" y="36" width="184" height="184" rx="56" fill="#ff3f8e"/>
+  <polygon points="104,76 104,180 183,128" fill="#ffffff"/>
+</svg>
