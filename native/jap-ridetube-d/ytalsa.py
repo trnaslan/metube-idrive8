@@ -217,6 +217,10 @@ OURS = re.compile(r'oap|generic|dynamic|online|media|entertain|browser|video|str
 NOT_OURS = re.compile(r'rse|rear|interrupt|overlay|vol_|ratio|sink|capture|_c$|(?:^|_)mic(?:_|$)|microphone|'
                       r'tel|ring|phone|hfp|nav|tts|sds|speech|voice|pdc|park|gong|chime|warn|ecall|emergency|alert|service|'
                       r'voip|call|sim|nuance|dictat|physical', re.I)
+# the media engine's own output (named in /etc/mediaconfig/mediaengine_config_hu.xml and mediaapp_config_hu.xml of an
+# iDrive 8 head unit: "smartx:MediaSink_AudioOut_Front_CF_48_COMBINED_STEREO_MULTICHANNEL"): the car's media sound goes
+# through it, so it is ours although "sink" is in its name
+MEDIA_OUT = re.compile(r'^MediaSink_AudioOut_', re.I)
 # the devices of other sources of the car, by their names: never among "the router's other devices" either
 THEIRS = re.compile(r'click|beep|haptic|welcome|asd|ecnr|siri|alexa|carplay|carlife|android|aap|a2dp|bluetooth|(?:^|_)bt|usb|tuner|radio|dab|sxm|sdars|'
                     r'(?:^|_)cd(?:_|$)|dvd|aux|optical|ipod|mirror|record|loopback|test|diag', re.I)
@@ -235,6 +239,8 @@ def score(name):
         s = 60
     elif re.search(r'entertain|media', name, re.I):
         s = 40
+    if MEDIA_OUT.search(name):
+        s = 120
     return s - len(name) / 100.0
 
 
@@ -508,6 +514,8 @@ def probe(argv):
 
     def ours(n):
         # (a device whose name says nothing but which the configuration gives to a player of ours counts too)
+        if MEDIA_OUT.search(n):
+            return True
         return (OURS.search(n) or any(re.search(r'oap|dynamic|online', w, re.I) for w in near.get(n, []))) and not NOT_OURS.search(n) and not THEIRS.search(n)
 
     def rank(n):
