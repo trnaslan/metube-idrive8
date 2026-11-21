@@ -287,6 +287,17 @@ check('  ... which player a configuration gives a device to is read with it: a d
 check('  ... the router\'s other devices - names that say nothing, free, not the telephone\'s, a warning\'s or another source\'s - are listed apart: listened to only when none of ours plays',
       res['others'] == ['plug:smartx:Out3_CF_48_STEREO', 'plug:smartx:Zone1'] and not any(re.search('CarLife|AndroidAuto|Voip|eSim|Nuance', d['name']) for d in res['devices']), (res['others'], res['devices']))
 check('  ... and nothing was opened', open(log).read() == '', open(log).read())
+# the media engine's own output of an iDrive 8 head unit (the names the car's configuration gives): ours although "sink" is in it
+c2, s2, r2 = (os.path.join(tmp, n) for n in ('conf2', 'shm2', 'run2'))
+for d in (c2, s2, r2):
+    os.mkdir(d)
+open(os.path.join(c2, 'mediaapp_config_hu.xml'), 'w').write('<device>plug:smartx:FingerPrintSink_CF_48_STEREO</device>\n'
+                                                            '<alsa_id>smartx:MediaSink_AudioOut_Front_CF_48_COMBINED_STEREO_MULTICHANNEL</alsa_id>\n'
+                                                            '<alsa_id>smartx:Media_Overlay_Converter_Source_CF_24_MONO</alsa_id>')
+p2 = subprocess.run([sys.executable, '-I', ytalsa, 'probe', '--shm', s2, '--run', r2, '--conf', c2, '--am', am, '--proc', proc, '--asound', asound, '--alsa-lib', lib], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dict(os.environ, FAKE_ASOUND_LOG=log))
+res2 = json.loads(p2.stdout)
+check('probe: the media engine\'s output (MediaSink_AudioOut_...) is among the devices to try although "sink" is in its name; the fingerprint sink and the overlay are not',
+      [d['name'] for d in res2['devices']] == ['plug:smartx:MediaSink_AudioOut_Front_CF_48_COMBINED_STEREO_MULTICHANNEL'], res2['devices'])
 # the plumbing: who has what, read from /proc and the configuration
 pl = res.get('plumbing') or {}
 check('the plumbing: every buffer there is (the amplifier\'s too), the program that has one mapped or a kernel device open, the streams in use, the configuration\'s devices and the media engine\'s words',
