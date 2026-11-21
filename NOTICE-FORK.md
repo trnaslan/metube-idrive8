@@ -34,3 +34,11 @@ guesses (a 12-byte id, no ITEM_ID): every list stayed empty. Now, in that case, 
 form that played on the G87 the service was confirmed on: FILE_SIZE / ITEM_ID / FILE_NAME, id four bytes 03 B8 00 01 on
 TempMedia (type per instance: Media 0, TempMedia 3, TempLumMedia 4; number from the logging id RTB8). It only counts when
 it plays; otherwise the other forms follow. Host-tested against the fake car; the real car is the test.
+
+## The media engine's own output (service 0.5.5)
+
+On the iDrive 8 head unit the car's media engine writes to the ALSA device
+`smartx:MediaSink_AudioOut_Front_CF_48_COMBINED_STEREO_MULTICHANNEL` (named in
+`/etc/mediaconfig/mediaengine_config_hu.xml` and `mediaapp_config_hu.xml`). Its name has "sink" in it, which
+`ytalsa.py probe` took for a device that is not ours, so the direct route never tried it. It is now ours (first
+among the devices to try). `test/test_ytalsa.py` covers it.
