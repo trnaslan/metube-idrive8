@@ -27,3 +27,10 @@ Now, with silentVideo on (default on an id8 head unit; MGU_YT_SILENT_VIDEO=0/1 f
 picture on the service's own clock (playSilent/silentTick in ytd.js) and tells the driver (note + toast). Pause, resume,
 seek, stop and "ended" work on that clock. Sound is NOT fixed by this. Host-tested only (test_ytd.js, fake ytdec); the
 picture path on the car is unverified.
+
+## Known item form when BMW's code cannot be read (service 0.5.4)
+Found on a G20 car: no installed app carries BMW's player code, so sdkread found no item form and the service only tried
+guesses (a 12-byte id, no ITEM_ID): every list stayed empty. Now, in that case, sound.js (builtinIdForms) first tries the
+form that played on the G87 the service was confirmed on: FILE_SIZE / ITEM_ID / FILE_NAME, id four bytes 03 B8 00 01 on
+TempMedia (type per instance: Media 0, TempMedia 3, TempLumMedia 4; number from the logging id RTB8). It only counts when
+it plays; otherwise the other forms follow. Host-tested against the fake car; the real car is the test.

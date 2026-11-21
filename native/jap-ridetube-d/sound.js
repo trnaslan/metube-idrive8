@@ -687,6 +687,8 @@ DynRoute.prototype.play = async function (file, info, hint) {
                 }
                 if (r.out === 'empty') { empty.push([f.id, l.name]); sample = sample || r.item; continue; }
                 if (r.out === 'unprepared') { not[l.key] = l.name + ' (' + String(r.why).slice(0, 90) + ')'; continue; }
+                // (a guess of ours that did not play proves nothing about the car: only a play counts, the other forms follow)
+                if (f.family === 'builtin') { lastWhy = r.why || r.out; continue; }
                 lastWhy = r.why || r.out;
                 // (a token or a connection lost, a form the binding refuses: the search below deals with those)
                 if (r.out !== 'idle' && r.out !== 'item-error') { stop = true; continue; }
@@ -702,7 +704,8 @@ DynRoute.prototype.play = async function (file, info, hint) {
         sum();
         // none in its list: the likeliest id at every place once more, now with BMW's own start and PLAY each (should
         // its list not say what it holds) and a look whether the car's media engine opened the file
-        if (!taken && !stop && forms.length !== 1) { forms = [ids[0]]; queue = places.map((x) => [ids[0], x]); }
+        // (not for the known form of ours, a guess: the other forms are still to be tried)
+        if (!taken && !stop && forms.length !== 1 && ids[0].family !== 'builtin') { forms = [ids[0]]; queue = places.map((x) => [ids[0], x]); }
     }
     if (hint && by(forms.concat(ids), hint.form) && by(locs, hint.loc)) queue.unshift([by(forms.concat(ids), hint.form), by(locs, hint.loc)]);
     // the first instance gets the whole search; the next ones a shorter one
@@ -1061,7 +1064,7 @@ Sound.prototype.logIds = function (donor) {
  * else the template's id is written here with the types 1 to 6. Each use counts the id's last two bytes on. */
 Sound.prototype.idForms = function (inst) {
     const r = this.sdk, out = [], seen = {};
-    if (!r || !r.ok) return out;
+    if (!r || !r.ok) return this.builtinIdForms(inst);
     const norm = (x) => String(x || '').replace(/^DynamicMediaPlayer/, '').replace(/^Entertainment/, '').replace(/Media$/, '').toLowerCase();
     const add = (key, tpl) => {
         const id = Array.isArray(tpl) && tpl[0] && tpl[0].id;
@@ -1088,6 +1091,40 @@ Sound.prototype.idForms = function (inst) {
             recs.filter((x) => x.inst === null).forEach((x) => add(x.log, sdkread.decode(x.out)));
         }
     }
+    return out;
+};
+/* MeTube: BMW's item for our file when BMW's own code could not be read on this car (no installed app carries the SDK's
+ * player). The form that played on the car this service was first confirmed on (a G87, CHANGELOG Beta 1): metadata
+ * FILE_SIZE, ITEM_ID (the id again) and FILE_NAME, the id four bytes - the player instance's type in the low half of the
+ * first byte, the low byte of the app's number in the second, a count in the last two. Types: Entertainment 0,
+ * EntertainmentTemp 3, EntertainmentTempLum 4 (Interrupt 1, Overlay 2). An all-zero id, or a long one like a video's,
+ * is answered OK and the list stays empty. The id's number is tried as the low byte alone (as on that car), then as our
+ * logging id would give it like a BMW app's; the other types follow. Each use counts the id's last two bytes on. */
+Sound.prototype.builtinIdForms = function (inst) {
+    const out = [], seen = {};
+    if (this.o.builtinIds === false) return out;
+    const S = sdkread.SAMPLE;
+    const types = { '': 0, temp: 3, templum: 4 };
+    const name = String(inst || '').replace(/^DynamicMediaPlayer/, '').replace(/Media$/, '').toLowerCase();
+    const own = Object.prototype.hasOwnProperty.call(types, name) ? types[name] : null;
+    const nums = this.logIds(null).filter((x) => x.n !== null);
+    const low = nums.filter((x) => x.key === 'ours-low').concat(nums.filter((x) => x.key === 'ours'));
+    // (the instance's own type only: that is the form that played on the car it was confirmed on; each try costs seconds)
+    const typeOrder = own === null ? [0, 3, 4, 1, 2] : [own];
+    const mkTpl = (id) => [{ pos: 1, id: id, metadata: [
+        { key: 'FILE_SIZE', value: { numeric: S.size } }, { key: 'ITEM_ID', value: { id: id } }, { key: 'FILE_NAME', value: { stringValue: S.file } }] }];
+    typeOrder.forEach((t) => low.forEach((x) => {
+        const id = itemId(x.n, t, 1), hex = id.slice(0, 2).toString('hex').toUpperCase() + 'xxxx';
+        if (seen[hex]) return;
+        seen[hex] = true;
+        const tpl = mkTpl(id);
+        out.push({ key: 'builtin:' + x.key + '.' + t, family: 'builtin', id: hex, name: 'the known item form, id ' + hex, make: (value, size) => {
+            const to = Buffer.from(id);
+            this.idCount = ((this.idCount || 0) + 1) & 0xffff;
+            to.writeUInt16BE(this.idCount, 2);
+            return swap(fill(tpl, value, size), id, to);
+        } });
+    }));
     return out;
 };
 /* Which of the car's media programs has this file open now: its name, null (none of them), undefined (they were

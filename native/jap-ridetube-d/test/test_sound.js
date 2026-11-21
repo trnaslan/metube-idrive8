@@ -37,7 +37,7 @@ async function unit(ways, o) {
     fs.writeFileSync(head, 'h'.repeat(321));
     fs.writeFileSync(path.join(root, 'ytaud'), '');
     const seen = { state: [], time: [], error: [], note: [] }, lg = [];
-    const opts = Object.assign({ someip: car.sip, srcGen: gen, oapRoot: oap, audioConf: path.join(root, 'audio.json'), stateDir: path.join(root, 'state'), id8: true, noSetuid: true, version: 'T1',
+    const opts = Object.assign({ builtinIds: !!o.builtin, someip: car.sip, srcGen: gen, oapRoot: oap, audioConf: path.join(root, 'audio.json'), stateDir: path.join(root, 'state'), id8: true, noSetuid: true, version: 'T1',
         playerWaitMs: 30, playerAfterMs: 30, availWaitMs: 300, dynWaitMs: 300, dynHeartbeatMs: 40, dynConnectMs: 300, dynListMs: 60, dynAutoMs: 120, dynStartWaitMs: 160, dynLookMs: 250, sdkGapMs: 0,
         codeHomes: ['oap_12209'], runDir: path.join(root, 'run'), oeDir: path.join(root, 'oe'), procDir: path.join(root, 'proc'), direct: false, alsaCmd: [process.execPath, fakeAlsa], ytaud: path.join(root, 'ytaud'), directStartMs: 1500, scanMs: 300, scanBaseMs: 200, amSettleMs: 5,
         alsaEnv: Object.assign({ FAKE_ALSA_LOG: path.join(root, 'alsa.log'), FAKE_ALSA_WAYS: JSON.stringify(o.alsa || {}), FAKE_ALSA_STATE: car.stateFile }, o.alsaEnv || {}), log: (m) => lg.push(m) }, o.audio || {});
@@ -777,6 +777,45 @@ async function main() {
         await d.close();
         assert.deepStrictEqual(u.car.conns, []);
         u.car.stop();
+    });
+
+    await t('BMW\'s code not readable on the car: the known item form is tried (id 03 B8 00 01 for TempMedia, FILE_SIZE / ITEM_ID / FILE_NAME), never an id of the video\'s name', async () => {
+        const { Sound } = require('../sound.js');
+        const s = Object.create(Sound.prototype);
+        s.sdk = null; s.expose = { appHome: () => null }; s.o = { log() {} };
+        s.logIds = () => [{ key: 'ours', n: 0xAB8 }, { key: 'ours-low', n: 0xB8 }, { key: 'none', n: null }];
+        const first = (inst) => s.idForms(inst)[0];
+        assert.strictEqual(first('DynamicMediaPlayerTempMedia').id, '03B8xxxx');
+        assert.strictEqual(first('DynamicMediaPlayerMedia').id, '00B8xxxx');
+        assert.strictEqual(first('DynamicMediaPlayerTempLumMedia').id, '04B8xxxx');
+        const f = first('DynamicMediaPlayerTempMedia');
+        const a = f.make('/var/opt/x/audio.m4a', 97110)[0], b = f.make('/var/opt/x/audio.m4a', 97110)[0];
+        assert.deepStrictEqual(a.metadata.map((m) => m.key), ['FILE_SIZE', 'ITEM_ID', 'FILE_NAME']);
+        assert.strictEqual(a.id.length, 4);
+        assert.ok(a.id.equals(Buffer.from('03b80001', 'hex')), a.id.toString('hex'));
+        assert.ok(a.metadata[1].value.id.equals(a.id), 'ITEM_ID carries the same id');
+        assert.deepStrictEqual(a.metadata[0].value, { numeric: 97110 });
+        assert.deepStrictEqual(a.metadata[2].value, { stringValue: '/var/opt/x/audio.m4a' });
+        assert.ok(b.id.equals(Buffer.from('03b80002', 'hex')), 'the count goes on: ' + b.id.toString('hex'));
+        assert.ok(s.idForms('DynamicMediaPlayerTempMedia').every((x) => x.id.length === 8), 'only four-byte ids');
+        s.logIds = () => [{ key: 'none', n: null }];
+        assert.deepStrictEqual(s.idForms('DynamicMediaPlayerTempMedia'), [], 'no number to make an id of: none is made up');
+    });
+
+    await t('BMW\'s code not readable, a car whose lists take only the known id (03 B8 .. on TempMedia): the known form plays there, found without any read', async () => {
+        const u = await unit({ idOk: (id, inst) => inst === 'DynamicMediaPlayerTempMedia' && id.length === 4 && id[0] === 0x03 && id[1] === 0xB8 }, { sdk: false, builtin: true });
+        await u.a.play(u.file);
+        assert.ok(/^builtin:ours-low\.3$/.test(u.kept().form), u.kept().form + '\n' + u.story());
+        assert.ok(/NOT through the car's dynamic media player \(Media\)/.test(u.story()), 'the first instance gave nothing: ' + u.story());
+        assert.ok(/PLAYS: DynamicMediaPlayerTempMedia/.test(u.story()), u.story());
+        await u.a.release();
+    });
+
+    await t('BMW\'s code not readable, a binding that takes only typed values: the known form (named values) is taken wrong, the search goes on and the typed form plays', async () => {
+        const u = await unit({ union: 'typed', bad: 'silent', unreadable: 'silent' }, { sdk: false, builtin: true });
+        await u.a.play(u.file);
+        assert.strictEqual(u.kept().form, 'tb', u.story());
+        await u.a.release();
     });
 
     console.log(results.join('\n'));
