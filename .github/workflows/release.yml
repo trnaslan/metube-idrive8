@@ -41,7 +41,7 @@ jobs:
         run: git clone --depth 1 https://github.com/robertnisipeanu/mgu-store "$RUNNER_TEMP/mgu-store"
 
       - name: Build the release (dist/release/)
-        run: MGU_STORE="$RUNNER_TEMP/mgu-store" RELEASE_TAG=catalog tools/release_id8.sh
+        run: MGU_STORE="$RUNNER_TEMP/mgu-store" RELEASE_TAG=catalog sh tools/release_id8.sh
 
       - name: Publish it as the release "catalog"
         env:
