@@ -62,7 +62,7 @@ MGU_STORE="$MGU_STORE" node kit/tools/test_mgu8.js | tail -1 | grep -q '^mgu8: a
 sh "$root/native/ytaud/build.sh" "$d/build/ytaud"
 python3 -I "$root/native/ytaud/test_ytaud.py" "$d/build/ytaud" >/dev/null || { echo "release_id8.sh: native/ytaud/test_ytaud.py did not pass" >&2; exit 1; }
 (cd "$d" && node test/test_ytd.js >/dev/null && node test/test_sdkread.js >/dev/null && node test/test_sound.js >/dev/null && node test/test_thumb.js >/dev/null)
-python3 -I "$d/test/test_ytalsa.py" >/dev/null || { echo "release_id8.sh: test_ytalsa.py did not pass" >&2; exit 1; }
+python3 -I "$d/test/test_ytalsa.py" > "$root/ytalsa.out" 2>&1 || { grep -v '^ok' "$root/ytalsa.out" | tail -40 >&2; echo "release_id8.sh: test_ytalsa.py did not pass" >&2; exit 1; }
 node tools/test_id8_collect.js >/dev/null
 
 node "$MGU_STORE/deploy/hu" artifact "$d" --out "$d/dist"
